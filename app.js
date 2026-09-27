@@ -1,6 +1,4 @@
-import {
-  initializeApp
-} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
 
 import {
   getFirestore,
@@ -25,7 +23,7 @@ const db = getFirestore(app);
 
 
 // =====================================================
-// VARIÁVEIS
+// ESTADO DO SITE
 // =====================================================
 
 let gifts = [];
@@ -33,102 +31,229 @@ let selectedGift = null;
 
 
 // =====================================================
-// FUNÇÃO AUXILIAR PARA PEGAR ELEMENTOS
+// FUNÇÃO AUXILIAR
 // =====================================================
 
-const $ = (id) => document.getElementById(id);
-
-
-// =====================================================
-// PRESENTES PADRÃO
-// =====================================================
-
-const localSeed = () => {
-  return seedGifts.map(g => ({
-    ...g
-  }));
-};
-
-
-// =====================================================
-// CARREGAR PRESENTES DO FIREBASE
-// =====================================================
-
-async function loadGifts() {
-
-  const snap = await getDocs(
-    collection(db, "gifts")
-  );
-
-  if (snap.empty) {
-
-    gifts = localSeed();
-
-  } else {
-
-    gifts = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    }));
-
-  }
-
-  render();
+function $(id) {
+  return document.getElementById(id);
 }
 
 
 // =====================================================
-// RENDERIZAR LISTA
+// COPIA DOS PRESENTES PADRÃO
+// =====================================================
+
+function getSeedGifts() {
+  return seedGifts.map(gift => ({
+    ...gift
+  }));
+}
+
+
+// =====================================================
+// CARREGAR PRESENTES
+// =====================================================
+
+async function loadGifts() {
+
+  try {
+
+    const snapshot = await getDocs(
+      collection(db, "gifts")
+    );
+
+    console.log(
+      "Firebase: documentos encontrados:",
+      snapshot.size
+    );
+
+
+    // -------------------------------------------------
+    // FIRESTORE VAZIO
+    // -------------------------------------------------
+
+    if (snapshot.empty) {
+
+      console.log(
+        "Firestore vazio. Usando lista local."
+      );
+
+      gifts = getSeedGifts();
+
+    } else {
+
+      gifts = snapshot.docs.map(documento => {
+
+        const data = documento.data();
+
+        return {
+
+          id: documento.id,
+
+          name: data.name || "Presente",
+
+          category: data.category || "Casa",
+
+          emoji: data.emoji || "🎁",
+
+          description:
+            data.description ||
+            "Presente para nossa nova casa.",
+
+          reserved:
+            data.reserved === true,
+
+          reservedBy:
+            data.reservedBy || "",
+
+          reservedAt:
+            data.reservedAt || "",
+
+          visible:
+            data.visible !== false
+
+        };
+
+      });
+
+    }
+
+
+    console.log(
+      "Presentes carregados:",
+      gifts.length
+    );
+
+
+    render();
+
+  } catch (error) {
+
+    console.error(
+      "Erro ao carregar Firestore:",
+      error
+    );
+
+
+    // Se o Firebase falhar,
+    // ainda mostra os 100 presentes.
+
+    gifts = getSeedGifts();
+
+    render();
+
+
+    showNotice(
+      "Os presentes foram carregados, mas houve um problema de conexão com o Firebase.",
+      true
+    );
+  }
+}
+
+
+// =====================================================
+// RENDERIZAR PRESENTES
 // =====================================================
 
 function render() {
 
-  const searchElement = $("search");
-  const categoryElement = $("category");
+  const searchInput = $("search");
+  const categorySelect = $("category");
+  const grid = $("giftGrid");
 
-  if (!searchElement || !categoryElement) {
+
+  if (!searchInput || !categorySelect || !grid) {
+
+    console.error(
+      "Elementos da página não encontrados."
+    );
+
     return;
   }
 
-  const q = searchElement.value
-    .toLowerCase()
-    .trim();
 
-  const cat = categoryElement.value;
-
-
-  // Apenas presentes visíveis
-  const visible = gifts.filter(
-    g => g.visible !== false
-  );
+  const search =
+    searchInput.value
+      .toLowerCase()
+      .trim();
 
 
-  // Filtrar presentes
-  const filtered = visible.filter(g => {
+  const category =
+    categorySelect.value;
 
-    const categoryMatches =
-      cat === "Todos" ||
-      g.category === cat;
 
-    const nameMatches =
-      (g.name || "")
-        .toLowerCase()
-        .includes(q);
+  // -------------------------------------------------
+  // SOMENTE PRESENTES VISÍVEIS
+  // -------------------------------------------------
 
-    const descriptionMatches =
-      (g.description || "")
-        .toLowerCase()
-        .includes(q);
-
-    return (
-      categoryMatches &&
-      (nameMatches || descriptionMatches)
+  const visibleGifts =
+    gifts.filter(gift =>
+      gift.visible !== false
     );
 
-  });
+
+  // -------------------------------------------------
+  // FILTRO
+  // -------------------------------------------------
+
+  const filtered =
+    visibleGifts.filter(gift => {
+
+      const name =
+        String(gift.name || "")
+          .toLowerCase();
+
+      const description =
+        String(gift.description || "")
+          .toLowerCase();
+
+      const giftCategory =
+        String(gift.category || "")
+          .trim();
 
 
-  // Informação dos resultados
+      const matchesCategory =
+        category === "Todos" ||
+        giftCategory === category;
+
+
+      const matchesSearch =
+        name.includes(search) ||
+        description.includes(search);
+
+
+      return (
+        matchesCategory &&
+        matchesSearch
+      );
+
+    });
+
+
+  // -------------------------------------------------
+  // CONTADORES
+  // -------------------------------------------------
+
+  const available =
+    visibleGifts.filter(
+      gift => gift.reserved !== true
+    ).length;
+
+
+  if ($("availableCount")) {
+
+    $("availableCount").textContent =
+      available;
+  }
+
+
+  if ($("visibleCount")) {
+
+    $("visibleCount").textContent =
+      visibleGifts.length;
+  }
+
+
   if ($("resultInfo")) {
 
     $("resultInfo").textContent =
@@ -137,111 +262,147 @@ function render() {
           ? "presente encontrado"
           : "presentes encontrados"
       }`;
-
   }
 
 
-  // Montar os cards
-  if ($("giftGrid")) {
+  // -------------------------------------------------
+  // NENHUM RESULTADO
+  // -------------------------------------------------
 
-    $("giftGrid").innerHTML =
-      filtered.length
+  if (filtered.length === 0) {
 
-        ? filtered.map(g => `
+    grid.innerHTML = `
+      <div class="empty">
 
-          <article class="gift">
+        🔎
 
-            <div class="gift-image">
-              ${g.emoji || "🎁"}
-            </div>
+        <br><br>
 
-            <div class="gift-body">
+        <strong>Nenhum presente encontrado</strong>
 
-              <span class="gift-category">
-                ${g.category || ""}
-              </span>
+        <br>
 
-              <h3>
-                ${g.name || "Presente"}
-              </h3>
+        Não encontramos presentes nessa categoria.
 
-              <p>
-                ${g.description || ""}
-              </p>
+        <br><br>
 
-              <div class="status ${
-                g.reserved
+        <button
+          id="clearFilters"
+          class="primary"
+          style="max-width:220px"
+        >
+          Mostrar todos
+        </button>
+
+      </div>
+    `;
+
+
+    const clear =
+      $("clearFilters");
+
+
+    if (clear) {
+
+      clear.onclick = () => {
+
+        $("search").value = "";
+
+        $("category").value = "Todos";
+
+        render();
+
+      };
+
+    }
+
+
+    return;
+  }
+
+
+  // -------------------------------------------------
+  // DESENHAR CARDS
+  // -------------------------------------------------
+
+  grid.innerHTML =
+    filtered.map(gift => {
+
+      const reserved =
+        gift.reserved === true;
+
+
+      return `
+
+        <article class="gift">
+
+          <div class="gift-image">
+            ${escapeHtml(gift.emoji)}
+          </div>
+
+          <div class="gift-body">
+
+            <span class="gift-category">
+              ${escapeHtml(gift.category)}
+            </span>
+
+            <h3>
+              ${escapeHtml(gift.name)}
+            </h3>
+
+            <p>
+              ${escapeHtml(gift.description)}
+            </p>
+
+
+            <div
+              class="status ${
+                reserved
                   ? "reserved"
                   : "available"
-              }">
+              }"
+            >
 
-                ${
-                  g.reserved
-                    ? "🔴 Já reservado"
-                    : "🟢 Disponível"
-                }
-
-              </div>
-
-              <button
-                ${g.reserved ? "disabled" : ""}
-                data-id="${g.id}"
-              >
-
-                ${
-                  g.reserved
-                    ? "Presente reservado"
-                    : "Quero dar este presente"
-                }
-
-              </button>
+              ${
+                reserved
+                  ? "🔴 Já reservado"
+                  : "🟢 Disponível"
+              }
 
             </div>
 
-          </article>
 
-        `).join("")
+            <button
+              ${
+                reserved
+                  ? "disabled"
+                  : ""
+              }
 
-        : `
-          <div class="empty">
+              data-id="${escapeHtml(gift.id)}"
+            >
 
-            🔎<br>
+              ${
+                reserved
+                  ? "Presente reservado"
+                  : "Quero dar este presente"
+              }
 
-            <strong>
-              Nenhum presente encontrado
-            </strong>
-
-            <br>
-
-            Tente outro nome ou categoria.
+            </button>
 
           </div>
-        `;
 
-  }
+        </article>
 
+      `;
 
-  // Quantidade disponível
-  if ($("availableCount")) {
-
-    $("availableCount").textContent =
-      visible.filter(
-        g => !g.reserved
-      ).length;
-
-  }
+    }).join("");
 
 
-  // Quantidade visível
-  if ($("visibleCount")) {
+  // -------------------------------------------------
+  // BOTÕES
+  // -------------------------------------------------
 
-    $("visibleCount").textContent =
-      visible.length;
-
-  }
-
-
-  // Botões de reserva
   document
     .querySelectorAll(
       ".gift button:not([disabled])"
@@ -257,80 +418,75 @@ function render() {
       };
 
     });
-
 }
 
 
 // =====================================================
-// ABRIR MODAL DE RESERVA
+// ABRIR MODAL
 // =====================================================
 
 function openReservation(id) {
 
-  selectedGift =
+  const gift =
     gifts.find(
-      g => g.id === id
+      item => item.id === id
     );
 
 
-  // Segurança
-  if (
-    !selectedGift ||
-    selectedGift.reserved ||
-    selectedGift.visible === false
-  ) {
+  if (!gift) {
+
+    alert(
+      "Presente não encontrado."
+    );
 
     return;
-
   }
 
 
-  if ($("modalEmoji")) {
+  if (gift.reserved) {
 
-    $("modalEmoji").textContent =
-      selectedGift.emoji || "🎁";
-
-  }
-
-
-  if ($("modalTitle")) {
-
-    $("modalTitle").textContent =
-      selectedGift.name || "Presente";
-
-  }
-
-
-  if ($("modalDescription")) {
-
-    $("modalDescription").textContent =
-      selectedGift.description || "";
-
-  }
-
-
-  if ($("guestName")) {
-
-    $("guestName").value = "";
-
-  }
-
-
-  if ($("modal")) {
-
-    $("modal").classList.remove(
-      "hidden"
+    alert(
+      "Esse presente já foi reservado."
     );
 
+    return;
   }
 
 
-  if ($("guestName")) {
+  if (gift.visible === false) {
+
+    return;
+  }
+
+
+  selectedGift = gift;
+
+
+  $("modalEmoji").textContent =
+    gift.emoji || "🎁";
+
+
+  $("modalTitle").textContent =
+    gift.name;
+
+
+  $("modalDescription").textContent =
+    gift.description;
+
+
+  $("guestName").value = "";
+
+
+  $("modal").classList.remove(
+    "hidden"
+  );
+
+
+  setTimeout(() => {
 
     $("guestName").focus();
 
-  }
-
+  }, 100);
 }
 
 
@@ -340,198 +496,340 @@ function openReservation(id) {
 
 function closeModal() {
 
-  if ($("modal")) {
+  $("modal").classList.add(
+    "hidden"
+  );
 
-    $("modal").classList.add(
-      "hidden"
-    );
+  selectedGift = null;
+}
+
+
+// =====================================================
+// AVISO
+// =====================================================
+
+function showNotice(message, error = false) {
+
+  const notice =
+    $("notice");
+
+
+  if (!notice) return;
+
+
+  notice.textContent =
+    message;
+
+
+  notice.style.display =
+    "block";
+
+
+  if (error) {
+
+    notice.style.background =
+      "#fff7ed";
+
+    notice.style.borderColor =
+      "#fed7aa";
+
+    notice.style.color =
+      "#9a3412";
+
+  } else {
+
+    notice.style.background =
+      "";
+
+    notice.style.borderColor =
+      "";
+
+    notice.style.color =
+      "";
 
   }
 
-  selectedGift = null;
 
+  setTimeout(() => {
+
+    notice.style.display =
+      "none";
+
+  }, 6000);
 }
 
 
 // =====================================================
-// BOTÃO FECHAR MODAL
+// RESERVAR PRESENTE
 // =====================================================
 
-if ($("closeModal")) {
+async function reserveGift() {
 
-  $("closeModal").onclick =
-    closeModal;
-
-}
-
-
-// =====================================================
-// CLICAR FORA DO MODAL
-// =====================================================
-
-if ($("modal")) {
-
-  $("modal").addEventListener(
-    "click",
-    e => {
-
-      if (
-        e.target === $("modal")
-      ) {
-
-        closeModal();
-
-      }
-
-    }
-  );
-
-}
+  const guestName =
+    $("guestName")
+      .value
+      .trim();
 
 
-// =====================================================
-// PESQUISA
-// =====================================================
+  if (!selectedGift) {
 
-if ($("search")) {
+    return;
 
-  $("search").addEventListener(
-    "input",
-    render
-  );
-
-}
+  }
 
 
-// =====================================================
-// CATEGORIA
-// =====================================================
+  if (!guestName) {
 
-if ($("category")) {
+    alert(
+      "Digite seu nome para continuar."
+    );
 
-  $("category").addEventListener(
-    "change",
-    render
-  );
+    $("guestName").focus();
 
-}
+    return;
 
-
-// =====================================================
-// CONFIRMAR RESERVA
-// =====================================================
-
-if ($("confirmBtn")) {
-
-  $("confirmBtn").onclick =
-    async () => {
-
-      const name =
-        $("guestName")
-          ?.value
-          ?.trim();
+  }
 
 
-      // Verificar nome
-      if (!name) {
-
-        alert(
-          "Digite seu nome para reservar o presente."
-        );
-
-        return;
-
-      }
+  const button =
+    $("confirmBtn");
 
 
-      // Verificar presente
-      if (!selectedGift) {
+  button.disabled = true;
 
-        alert(
-          "Nenhum presente foi selecionado."
-        );
-
-        return;
-
-      }
+  button.textContent =
+    "Registrando reserva...";
 
 
-      // Desativar botão
-      $("confirmBtn").disabled = true;
+  try {
+
+    const giftRef =
+      doc(
+        db,
+        "gifts",
+        selectedGift.id
+      );
 
 
-      try {
+    await runTransaction(
+      db,
+      async transaction => {
 
-        // Referência do presente
-        const ref =
-          doc(
-            db,
-            "gifts",
-            selectedGift.id
+        const snapshot =
+          await transaction.get(
+            giftRef
           );
 
 
-        // =================================================
-        // TRANSAÇÃO
-        // =================================================
+        if (!snapshot.exists()) {
 
-        await runTransaction(
-          db,
-          async transaction => {
+          throw new Error(
+            "NOT_FOUND"
+          );
 
-            const snap =
-              await transaction.get(
-                ref
-              );
+        }
 
 
-            // Documento não existe
-            if (!snap.exists()) {
-
-              throw new Error(
-                "NOT_FOUND"
-              );
-
-            }
+        const data =
+          snapshot.data();
 
 
-            const data =
-              snap.data();
+        // ---------------------------------------------
+        // VERIFICAR SE JÁ FOI RESERVADO
+        // ---------------------------------------------
+
+        if (
+          data.reserved === true
+        ) {
+
+          throw new Error(
+            "ALREADY_RESERVED"
+          );
+
+        }
 
 
-            // Já reservado
-            if (
-              data.reserved === true
-            ) {
+        // ---------------------------------------------
+        // VERIFICAR VISIBILIDADE
+        // ---------------------------------------------
 
-              throw new Error(
-                "UNAVAILABLE"
-              );
+        if (
+          data.visible === false
+        ) {
 
-            }
+          throw new Error(
+            "HIDDEN"
+          );
 
-
-            // Oculto
-            if (
-              data.visible === false
-            ) {
-
-              throw new Error(
-                "UNAVAILABLE"
-              );
-
-            }
+        }
 
 
-            // Atualizar reserva
-            transaction.update(
-              ref,
-              {
+        // ---------------------------------------------
+        // FAZER RESERVA
+        // ---------------------------------------------
 
-                reserved: true,
+        transaction.update(
+          giftRef,
+          {
 
-                reservedBy: name,
+            reserved: true,
 
-                reservedAt:
-                  new Date()
-                   
+            reservedBy:
+              guestName,
+
+            reservedAt:
+              new Date().toISOString()
+
+          }
+        );
+
+      }
+    );
+
+
+    // -------------------------------------------------
+    // SUCESSO
+    // -------------------------------------------------
+
+    closeModal();
+
+
+    showNotice(
+      `❤️ Obrigado, ${guestName}! Sua reserva foi registrada.`
+    );
+
+
+    // Atualizar lista
+    await loadGifts();
+
+
+  } catch (error) {
+
+    console.error(
+      "Erro ao reservar:",
+      error
+    );
+
+
+    if (
+      error.message ===
+      "ALREADY_RESERVED"
+    ) {
+
+      alert(
+        "Esse presente acabou de ser reservado por outra pessoa. Escolha outro. ❤️"
+      );
+
+    } else if (
+      error.message ===
+      "HIDDEN"
+    ) {
+
+      alert(
+        "Esse presente não está mais disponível."
+      );
+
+    } else if (
+      error.message ===
+      "NOT_FOUND"
+    ) {
+
+      alert(
+        "Esse presente não existe mais."
+      );
+
+    } else {
+
+      alert(
+        "Não foi possível registrar a reserva.\n\n" +
+        "Verifique sua conexão com a internet e tente novamente."
+      );
+
+    }
+
+
+    // Atualizar estado
+    await loadGifts();
+
+
+  } finally {
+
+    button.disabled = false;
+
+    button.textContent =
+      "Confirmar reserva ❤️";
+
+  }
+}
+
+
+// =====================================================
+// ESCAPAR HTML
+// =====================================================
+
+function escapeHtml(value) {
+
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+// =====================================================
+// EVENTOS
+// =====================================================
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    // Fechar modal
+    $("closeModal").onclick =
+      closeModal;
+
+
+    // Clique fora do modal
+    $("modal").addEventListener(
+      "click",
+      event => {
+
+        if (
+          event.target ===
+          $("modal")
+        ) {
+
+          closeModal();
+
+        }
+
+      }
+    );
+
+
+    // Pesquisa
+    $("search").addEventListener(
+      "input",
+      render
+    );
+
+
+    // Categoria
+    $("category").addEventListener(
+      "change",
+      render
+    );
+
+
+    // Confirmar reserva
+    $("confirmBtn").onclick =
+      reserveGift;
+
+
+    // Carregar presentes
+    loadGifts();
+
+  }
+);
