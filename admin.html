@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Área dos anfitriões — Alex, Jessica & Ayla</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="admin-wrap">
+<a href="index.html" class="back">← Voltar para a lista</a>
+<section class="admin-card">
+<span class="section-kicker">ÁREA EXCLUSIVA</span><h1>Painel dos anfitriões</h1>
+<p>Entre com a conta administrativa para acompanhar reservas e escolher quais presentes aparecem para os convidados.</p>
+<form id="loginForm"><label>E-mail</label><input id="email" type="email" required placeholder="seu@email.com">
+<label>Senha</label><input id="password" type="password" required placeholder="Sua senha">
+<button class="primary" type="submit">Entrar</button></form><div id="loginMsg" class="notice"></div>
+</section>
+<section id="panel" class="admin-card hidden">
+<div class="admin-top"><div><span class="section-kicker">PAINEL</span><h2>Lista de presentes</h2></div><button id="logout" class="secondary">Sair</button></div>
+<div id="adminStats" class="admin-stats"></div>
+<div class="admin-actions"><button id="seed" class="primary">Cadastrar / sincronizar os 100 presentes</button></div>
+<div class="visibility-help"><strong>👁️ Controle de visibilidade</strong><span>Deixe ligado o que vocês querem que apareça na lista pública. Desligue os itens que não querem receber. A alteração é salva automaticamente.</span></div>
+<div class="admin-controls"><input id="adminSearch" type="search" placeholder="🔎 Procurar item..."><select id="categoryAdmin"></select></div>
+<div id="manageList" class="manage-list"></div>
+</section></main><script type="module" src="admin.js"></script></body></html>
