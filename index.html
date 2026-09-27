@@ -1,97 +1,88 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chá de Casa Nova — Nossa Família — Alex & Jessica</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#166534">
+<title>Chá de Casa Nova — Alex & Jessica</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-
-<style>
-.family-note{
-  margin:24px auto 10px;
-  max-width:720px;
-  padding:14px 18px;
-  border:1px solid #bbf7d0;
-  border-radius:16px;
-  background:#f0fdf4;
-  color:#14532d;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
-  font-size:15px;
-  text-align:center;
-  box-shadow:0 6px 18px rgba(20,83,45,.08);
-}
-.family-note strong{color:#166534}
-</style>
-
 </head>
 <body>
 <header class="hero">
-  <div class="hero-card">
-    <span class="eyebrow">NOSSO CHÁ DE CASA NOVA</span>
-    <h1>Alex <span>&</span> Jessica</h1>
-    <p>Estamos começando uma nova fase juntos e queremos comemorar com vocês. ❤️</p>
-    <div class="hero-info">
-      <div><strong>🎁</strong><small>Escolha um presente</small></div>
-      <div><strong>❤️</strong><small>Reserve com seu nome</small></div>
-      <div><strong>🏠</strong><small>Faça parte da nossa casa</small></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <span class="eyebrow">CHÁ DE CASA NOVA</span>
+    <h1>Alex <i>&</i> Jessica</h1>
+    <p>Uma nova fase, um novo lar e muitas histórias para viver. Escolha um presente e faça parte desse momento com a nossa família. ❤️</p>
+    <div class="hero-actions">
+      <a href="#presentes" class="btn btn-light">Ver lista de presentes</a>
+      <a href="#familia" class="btn btn-ghost">Nossa família</a>
     </div>
   </div>
 </header>
 
-<main class="container">
-  <section class="intro">
+<main>
+<section id="familia" class="family container">
+  <div class="family-photo">
+    <img src="assets/family-photo.jpg" alt="Foto da família" onerror="this.src='assets/family-photo-placeholder.svg'">
+    <span>📷 A foto da família pode ser colocada aqui</span>
+  </div>
+  <div class="family-copy">
+    <span class="section-kicker">NOSSO NOVO LAR</span>
+    <h2>Uma casa para nossa família</h2>
+    <p>Estamos construindo um cantinho especial para viver juntos. A lista foi pensada para ajudar a montar nossa casa aos poucos, sem transformar o presente em uma compra pelo site.</p>
+    <div class="family-points">
+      <div><b>🏡</b><span>Nosso lar</span></div>
+      <div><b>❤️</b><span>Nossa família</span></div>
+      <div><b>🧸</b><span>Com carinho para Ayla</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="presentes" class="container gifts-section">
+  <div class="section-heading">
     <div>
       <span class="section-kicker">LISTA DE PRESENTES</span>
-      <h2>Escolha algo para nossa nova casa</h2>
-      <p>Os itens abaixo são apenas sugestões. Os anfitriões podem escolher quais itens ficam visíveis na lista. Ao reservar, o presente fica marcado para evitar que outra pessoa escolha o mesmo item.</p>
+      <h2>Escolha algo para a nossa casa</h2>
+      <p>São <strong>200 opções</strong>. Quando alguém reserva um item, ele fica indisponível para os próximos convidados.</p>
     </div>
-    <div class="counter"><b id="availableCount">100</b><span>disponíveis</span><small><span id="visibleCount">100</span> itens publicados</small></div>
-  </section>
+    <div class="stats">
+      <b id="availableCount">—</b><span>disponíveis</span>
+      <small><strong id="publishedCount">—</strong> publicados</small>
+    </div>
+  </div>
 
-  <section class="controls" aria-label="Filtrar presentes">
-    <input id="search" type="search" placeholder="🔎 Procurar presente...">
-    <select id="category">
-      <option value="Todos">Todas as categorias</option>
-      <option>Cozinha</option><option>Quarto</option><option>Banheiro</option>
-      <option>Sala</option><option>Limpeza</option><option>Lavanderia</option><option>Casa</option>
-    </select>
-  </section>
-
-  <div id="notice" class="notice" role="status"></div>
+  <div class="filters">
+    <label class="search"><span>⌕</span><input id="search" type="search" placeholder="Procurar presente..." autocomplete="off"></label>
+    <select id="category" aria-label="Categoria"><option value="Todos">Todas as categorias</option></select>
+  </div>
+  <div id="connection" class="connection">Conectando à lista...</div>
   <div id="resultInfo" class="result-info"></div>
-  <section id="giftGrid" class="grid"></section>
+  <div id="giftGrid" class="gift-grid"></div>
+</section>
 </main>
 
-<div id="modal" class="modal hidden">
-  <div class="modal-card">
-    <button class="close" id="closeModal">×</button>
+<div id="modal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button id="closeModal" class="modal-close" aria-label="Fechar">×</button>
     <div id="modalEmoji" class="modal-emoji">🎁</div>
     <span class="section-kicker">RESERVAR PRESENTE</span>
-    <h3 id="modalTitle"></h3>
+    <h2 id="modalTitle">Presente</h2>
     <p id="modalDescription"></p>
     <label for="guestName">Seu nome</label>
     <input id="guestName" maxlength="80" placeholder="Como podemos identificar você?">
-    <button id="confirmBtn" class="primary">Confirmar reserva ❤️</button>
-    <small class="modal-help">A reserva não é uma compra e não haverá pagamento pelo site.</small>
-  </div>
+    <button id="confirmBtn" class="btn btn-primary">Confirmar reserva ❤️</button>
+    <small>A reserva é apenas uma marcação da lista. Não existe pagamento pelo site.</small>
+  </section>
 </div>
 
 <footer>
-  <p>Feito com carinho para o nosso Chá de Casa Nova — Nossa Família ❤️</p>
-  <a href="admin.html" class="admin-link">Área dos anfitriões</a>
+  <p>Feito com carinho para o nosso Chá de Casa Nova. ❤️</p>
+  <a href="admin.html">Área dos anfitriões</a>
 </footer>
 <script type="module" src="app.js"></script>
-
-    <div class="family-note" aria-label="Família">
-      <span>🏡</span>
-      <span>Uma nova casa para nossa família, com carinho para <strong>Ayla</strong>.</span>
-    </div>
-    
 </body>
 </html>

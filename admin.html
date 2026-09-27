@@ -1,20 +1,38 @@
-<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Área dos anfitriões — Alex, Jessica & Ayla</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="admin-wrap">
-<a href="index.html" class="back">← Voltar para a lista</a>
-<section class="admin-card">
-<span class="section-kicker">ÁREA EXCLUSIVA</span><h1>Painel dos anfitriões</h1>
-<p>Entre com a conta administrativa para acompanhar reservas e escolher quais presentes aparecem para os convidados.</p>
-<form id="loginForm"><label>E-mail</label><input id="email" type="email" required placeholder="seu@email.com">
-<label>Senha</label><input id="password" type="password" required placeholder="Sua senha">
-<button class="primary" type="submit">Entrar</button></form><div id="loginMsg" class="notice"></div>
-</section>
-<section id="panel" class="admin-card hidden">
-<div class="admin-top"><div><span class="section-kicker">PAINEL</span><h2>Lista de presentes</h2></div><button id="logout" class="secondary">Sair</button></div>
-<div id="adminStats" class="admin-stats"></div>
-<div class="admin-actions"><button id="seed" class="primary">Cadastrar / sincronizar os 100 presentes</button></div>
-<div class="visibility-help"><strong>👁️ Controle de visibilidade</strong><span>Deixe ligado o que vocês querem que apareça na lista pública. Desligue os itens que não querem receber. A alteração é salva automaticamente.</span></div>
-<div class="admin-controls"><input id="adminSearch" type="search" placeholder="🔎 Procurar item..."><select id="categoryAdmin"></select></div>
-<div id="manageList" class="manage-list"></div>
-</section></main><script type="module" src="admin.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Área dos anfitriões — Casa Nova</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<main class="admin-page">
+  <a class="back-link" href="index.html">← Voltar para a lista</a>
+  <section id="loginCard" class="panel-card">
+    <span class="section-kicker">ÁREA EXCLUSIVA</span>
+    <h1>Painel dos anfitriões</h1>
+    <p>Use a conta administrativa criada no Firebase Authentication.</p>
+    <form id="loginForm">
+      <label>E-mail</label><input id="email" type="email" required autocomplete="username">
+      <label>Senha</label><input id="password" type="password" required autocomplete="current-password">
+      <button class="btn btn-primary" type="submit">Entrar</button>
+    </form>
+    <div id="loginMessage" class="notice hidden"></div>
+  </section>
+
+  <section id="adminPanel" class="panel-card hidden">
+    <div class="panel-head"><div><span class="section-kicker">ADMINISTRAÇÃO</span><h2>Lista de presentes</h2></div><button id="logout" class="btn btn-outline">Sair</button></div>
+    <div class="admin-stats">
+      <div><b id="totalStat">0</b><span>cadastrados</span></div>
+      <div><b id="visibleStat">0</b><span>visíveis</span></div>
+      <div><b id="reservedStat">0</b><span>reservados</span></div>
+    </div>
+    <div class="admin-actions">
+      <button id="syncButton" class="btn btn-primary">Publicar/sincronizar os 200 presentes</button>
+      <button id="releaseButton" class="btn btn-outline">Liberar reserva selecionada</button>
+    </div>
+    <div class="notice">Você controla quais itens aparecem para os convidados. As reservas ficam no Firestore.</div>
+    <div class="filters admin-filters"><input id="adminSearch" placeholder="Procurar item..."><select id="adminCategory"></select></div>
+    <div id="manageList" class="manage-list"></div>
+  </section>
+</main>
+<script type="module" src="admin.js"></script>
+</body>
+</html>
