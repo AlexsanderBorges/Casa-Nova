@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /gifts/{giftId} {
+      // Qualquer convidado pode ver a lista de presentes.
+      allow read: if true;
+
+      // Convidados podem apenas reservar um item existente e disponível.
+      allow update: if resource.data.reserved == false
+        && request.resource.data.reserved == true
+        && request.resource.data.reservedBy is string
+        && request.resource.data.reservedBy.size() > 0
+        && request.resource.data.reservedAt is string
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.category == resource.data.category
+        && request.resource.data.emoji == resource.data.emoji
+        && request.resource.data.description == resource.data.description
+        && request.resource.data.visible == resource.data.visible
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['reserved', 'reservedBy', 'reservedAt']);
+
+      // Usuário autenticado (a conta criada no Firebase) administra os itens.
+      allow create, delete: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+  }
+}

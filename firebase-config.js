@@ -1,11 +1,12 @@
-// Cole aqui a configuração do seu Web App no Firebase.
+// Configuração do seu Web App no Firebase (Casa Nova)
 export const firebaseConfig = {
-  apiKey: "COLE_SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO",
-  storageBucket: "SEU_PROJETO.firebasestorage.app",
-  messagingSenderId: "SEU_ID",
-  appId: "SEU_APP_ID"
+  apiKey: "AIzaSyCGHqBz9OX-pGDbvQ22Msn1GEmrz5dNmqA",
+  authDomain: "casa-nova-ad182.firebaseapp.com",
+  projectId: "casa-nova-ad182",
+  storageBucket: "casa-nova-ad182.firebasestorage.app",
+  messagingSenderId: "963100479641",
+  appId: "1:963100479641:web:827e320821e1371c85e808",
+  measurementId: "G-DP74K9D4Z9"
 };
 
 // Lista completa com 100 sugestões. "visible" controla se o item aparece para os convidados.
