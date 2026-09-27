@@ -1,160 +1,116 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-import {
-  getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp, setDoc
-} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
-import { seedGifts } from "./gifts.js";
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const $ = (id) => document.getElementById(id);
-let gifts = seedGifts.map(g => ({...g}));
-let selectedGift = null;
-let firestoreReady = false;
-
-const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-}[c]));
-
-function setConnection(text, ok=false) {
-  const el = $("connection");
-  el.textContent = text;
-  el.className = `connection ${ok ? "ok" : ""}`;
-}
-
-function populateCategories() {
-  const cats = [...new Set(gifts.map(g => g.category))];
-  $("category").innerHTML = `<option value="Todos">Todas as categorias</option>` +
-    cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
-}
-
-function render() {
-  const q = $("search").value.trim().toLowerCase();
-  const cat = $("category").value;
-  const visible = gifts.filter(g => g.visible !== false);
-  const filtered = visible.filter(g => {
-    const matchesCat = cat === "Todos" || g.category === cat;
-    const hay = `${g.name} ${g.description} ${g.category}`.toLowerCase();
-    return matchesCat && hay.includes(q);
-  });
-
-  $("availableCount").textContent = visible.filter(g => !g.reserved).length;
-  $("publishedCount").textContent = visible.length;
-  $("resultInfo").textContent = `${filtered.length} ${filtered.length === 1 ? "presente encontrado" : "presentes encontrados"}`;
-
-  $("giftGrid").innerHTML = filtered.length ? filtered.map(g => {
-    const reserved = g.reserved === true;
-    const canReserve = firestoreReady && !reserved;
-    return `<article class="gift-card">
-      <div class="gift-art">${esc(g.emoji || "🎁")}</div>
-      <div class="gift-body">
-        <span class="tag">${esc(g.category)}</span>
-        <h3>${esc(g.name)}</h3>
-        <p>${esc(g.description)}</p>
-        <div class="gift-bottom">
-          <span class="status ${reserved ? "reserved" : "available"}">${reserved ? "🔴 Já reservado" : "🟢 Disponível"}</span>
-          <button class="btn ${canReserve ? "btn-primary" : "btn-disabled"}" ${canReserve ? "" : "disabled"} data-gift="${esc(g.id)}">
-            ${reserved ? "Reservado" : (firestoreReady ? "Quero dar este presente" : "Lista ainda não publicada")}
-          </button>
-        </div>
-      </div>
-    </article>`;
-  }).join("") : `<div class="empty"><div>🔎</div><h3>Nenhum presente encontrado</h3><p>Tente outra palavra ou categoria.</p></div>`;
-
-  document.querySelectorAll("[data-gift]").forEach(btn => {
-    btn.addEventListener("click", () => openModal(btn.dataset.gift));
-  });
-}
-
-function openModal(id) {
-  selectedGift = gifts.find(g => g.id === id);
-  if (!firestoreReady || !selectedGift || selectedGift.reserved || selectedGift.visible === false) return;
-  $("modalEmoji").textContent = selectedGift.emoji || "🎁";
-  $("modalTitle").textContent = selectedGift.name;
-  $("modalDescription").textContent = selectedGift.description;
-  $("guestName").value = "";
-  $("modal").classList.remove("hidden");
-  $("modal").setAttribute("aria-hidden", "false");
-  setTimeout(() => $("guestName").focus(), 50);
-}
-
-function closeModal() {
-  $("modal").classList.add("hidden");
-  $("modal").setAttribute("aria-hidden", "true");
-  selectedGift = null;
-}
-
-async function reserveGift() {
-  const name = $("guestName").value.trim();
-  if (!selectedGift || name.length < 2) {
-    $("guestName").focus();
-    return;
-  }
-  const id = selectedGift.id;
-  const button = $("confirmBtn");
-  button.disabled = true;
-  button.textContent = "Reservando...";
-  try {
-    await runTransaction(db, async transaction => {
-      const ref = doc(db, "gifts", id);
-      const snap = await transaction.get(ref);
-      if (!snap.exists()) throw new Error("not-found");
-      const data = snap.data();
-      if (data.reserved === true) throw new Error("already-reserved");
-      transaction.update(ref, {
-        reserved: true,
-        reservedBy: name,
-        reservedAt: serverTimestamp()
-      });
-    });
-    closeModal();
-    alert("Presente reservado com sucesso! ❤️");
-  } catch (err) {
-    console.error(err);
-    if (err.message === "already-reserved") {
-      alert("Esse presente acabou de ser reservado por outra pessoa. Escolha outro item.");
-    } else {
-      alert("Não foi possível reservar agora. Verifique sua conexão e tente novamente.");
-    }
-  } finally {
-    button.disabled = false;
-    button.textContent = "Confirmar reserva ❤️";
-  }
-}
-
-$("search").addEventListener("input", render);
-$("category").addEventListener("change", render);
-$("closeModal").addEventListener("click", closeModal);
-document.querySelectorAll("[data-close]").forEach(el => el.addEventListener("click", closeModal));
-$("confirmBtn").addEventListener("click", reserveGift);
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
-
-populateCategories();
-render();
-
 onSnapshot(collection(db, "gifts"), snapshot => {
-  if (snapshot.empty) {
+  // Cria um mapa com os presentes que já existem no Firestore
+  const firestoreGifts = new Map(
+    snapshot.docs.map(d => [
+      d.id,
+      {
+        id: d.id,
+        ...d.data()
+      }
+    ])
+  );
+
+  // O site trabalha SOMENTE com os 100 presentes oficiais.
+  // Presentes antigos, como gift-101 até gift-200, serão ignorados.
+  gifts = seedGifts.map(seed => {
+    const saved = firestoreGifts.get(seed.id);
+
+    if (saved) {
+      return {
+        ...seed,
+        ...saved,
+        id: seed.id
+      };
+    }
+
+    return {
+      ...seed
+    };
+  });
+
+  // Verifica quais dos 100 presentes ainda não existem no Firestore
+  const missing = seedGifts.filter(
+    gift => !firestoreGifts.has(gift.id)
+  );
+
+  if (missing.length > 0) {
     firestoreReady = false;
-    gifts = seedGifts.map(g => ({...g}));
-    setConnection("Preparando a lista de 100 presentes...", false);
-    Promise.all(seedGifts.map(g => setDoc(doc(db, "gifts", g.id), {
-      name: g.name, category: g.category, emoji: g.emoji, description: g.description,
-      reserved: false, reservedBy: "", reservedAt: null, visible: true
-    }, {merge: false}))).catch(err => {
-      console.error(err);
-      setConnection("O Firestore recusou a criação dos presentes. Publique as regras do arquivo firestore.rules.", false);
-    });
+
+    setConnection(
+      `Preparando ${missing.length} presente(s) no Firestore...`,
+      false
+    );
+
+    // Cria somente os presentes que estão faltando
+    Promise.all(
+      missing.map(gift =>
+        setDoc(
+          doc(db, "gifts", gift.id),
+          {
+            name: gift.name,
+            category: gift.category,
+            emoji: gift.emoji,
+            description: gift.description,
+            reserved: false,
+            reservedBy: "",
+            reservedAt: null,
+            visible: true
+          }
+        )
+      )
+    )
+      .then(() => {
+        firestoreReady = true;
+
+        setConnection(
+          "Lista sincronizada em tempo real.",
+          true
+        );
+
+        populateCategories();
+        render();
+      })
+      .catch(error => {
+        console.error(error);
+
+        firestoreReady = false;
+
+        setConnection(
+          "O Firestore recusou a criação dos presentes. Publique as regras do arquivo firestore.rules.",
+          false
+        );
+
+        render();
+      });
+
   } else {
     firestoreReady = true;
-    gifts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    setConnection("Lista sincronizada em tempo real.", true);
+
+    setConnection(
+      "Lista sincronizada em tempo real.",
+      true
+    );
+
     populateCategories();
+    render();
   }
-  render();
+
 }, error => {
   console.error(error);
+
   firestoreReady = false;
-  setConnection("Não foi possível acessar o Firestore. Confira as regras e a configuração do Firebase.", false);
-  gifts = seedGifts.map(g => ({...g}));
+
+  setConnection(
+    "Não foi possível acessar o Firestore. Confira as regras e a configuração do Firebase.",
+    false
+  );
+
+  // Se o Firestore estiver indisponível,
+  // mostra temporariamente os 100 presentes locais.
+  gifts = seedGifts.map(gift => ({
+    ...gift
+  }));
+
+  populateCategories();
   render();
 });
