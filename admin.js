@@ -68,7 +68,7 @@ $("adminSearch").addEventListener("input", render);
 $("adminCategory").addEventListener("change", render);
 
 $("syncButton").addEventListener("click", async () => {
-  if (!confirm("Publicar os 200 presentes? Reservas e visibilidade existentes serão preservadas.")) return;
+  if (!confirm("Sincronizar os 100 presentes? Reservas e visibilidade existentes serão preservadas.")) return;
   $("syncButton").disabled = true;
   try {
     for (const g of seedGifts) {
@@ -76,7 +76,7 @@ $("syncButton").addEventListener("click", async () => {
         name:g.name, category:g.category, emoji:g.emoji, description:g.description
       }, {merge:true});
     }
-    alert("Os 200 presentes foram publicados/sincronizados.");
+    alert("Os 100 presentes foram sincronizados.");
   } catch (err) {
     console.error(err);
     alert("Falha ao publicar. Confira as regras do Firestore e sua autenticação.");

@@ -5,6 +5,18 @@ service cloud.firestore {
     match /gifts/{giftId} {
       allow read: if true;
 
+      // Primeira carga automática: somente IDs gift-001 até gift-100
+      // e somente no formato inicial de um presente livre.
+      allow create: if
+        giftId.matches('gift-0(0[1-9]|[1-9][0-9])|gift-100') &&
+        request.resource.data.reserved == false &&
+        request.resource.data.reservedBy == "" &&
+        request.resource.data.visible == true &&
+        request.resource.data.name is string &&
+        request.resource.data.category is string &&
+        request.resource.data.emoji is string &&
+        request.resource.data.description is string;
+
       // Convidado: só pode transformar um item livre em reservado.
       allow update: if
         resource.data.reserved == false &&
@@ -14,7 +26,7 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(["reserved", "reservedBy", "reservedAt"]);
 
-      // Área administrativa: exige usuário autenticado.
+      // Área administrativa.
       allow create, delete: if request.auth != null;
       allow update: if request.auth != null;
     }

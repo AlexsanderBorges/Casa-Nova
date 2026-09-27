@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp
+  getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 import { seedGifts } from "./gifts.js";
@@ -10,6 +10,7 @@ const db = getFirestore(app);
 const $ = (id) => document.getElementById(id);
 let gifts = seedGifts.map(g => ({...g}));
 let selectedGift = null;
+let firestoreReady = false;
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -43,6 +44,7 @@ function render() {
 
   $("giftGrid").innerHTML = filtered.length ? filtered.map(g => {
     const reserved = g.reserved === true;
+    const canReserve = firestoreReady && !reserved;
     return `<article class="gift-card">
       <div class="gift-art">${esc(g.emoji || "🎁")}</div>
       <div class="gift-body">
@@ -51,8 +53,8 @@ function render() {
         <p>${esc(g.description)}</p>
         <div class="gift-bottom">
           <span class="status ${reserved ? "reserved" : "available"}">${reserved ? "🔴 Já reservado" : "🟢 Disponível"}</span>
-          <button class="btn ${reserved ? "btn-disabled" : "btn-primary"}" ${reserved ? "disabled" : ""} data-gift="${esc(g.id)}">
-            ${reserved ? "Reservado" : "Quero dar este presente"}
+          <button class="btn ${canReserve ? "btn-primary" : "btn-disabled"}" ${canReserve ? "" : "disabled"} data-gift="${esc(g.id)}">
+            ${reserved ? "Reservado" : (firestoreReady ? "Quero dar este presente" : "Lista ainda não publicada")}
           </button>
         </div>
       </div>
@@ -66,7 +68,7 @@ function render() {
 
 function openModal(id) {
   selectedGift = gifts.find(g => g.id === id);
-  if (!selectedGift || selectedGift.reserved || selectedGift.visible === false) return;
+  if (!firestoreReady || !selectedGift || selectedGift.reserved || selectedGift.visible === false) return;
   $("modalEmoji").textContent = selectedGift.emoji || "🎁";
   $("modalTitle").textContent = selectedGift.name;
   $("modalDescription").textContent = selectedGift.description;
@@ -132,9 +134,18 @@ render();
 
 onSnapshot(collection(db, "gifts"), snapshot => {
   if (snapshot.empty) {
+    firestoreReady = false;
     gifts = seedGifts.map(g => ({...g}));
-    setConnection("Lista online ainda não publicada no Firestore — mostrando as 200 opções locais.", false);
+    setConnection("Preparando a lista de 100 presentes...", false);
+    Promise.all(seedGifts.map(g => setDoc(doc(db, "gifts", g.id), {
+      name: g.name, category: g.category, emoji: g.emoji, description: g.description,
+      reserved: false, reservedBy: "", reservedAt: null, visible: true
+    }, {merge: false}))).catch(err => {
+      console.error(err);
+      setConnection("O Firestore recusou a criação dos presentes. Publique as regras do arquivo firestore.rules.", false);
+    });
   } else {
+    firestoreReady = true;
     gifts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     setConnection("Lista sincronizada em tempo real.", true);
     populateCategories();
@@ -142,7 +153,8 @@ onSnapshot(collection(db, "gifts"), snapshot => {
   render();
 }, error => {
   console.error(error);
-  setConnection("Modo local: o Firebase ainda precisa ser configurado/publicado.", false);
+  firestoreReady = false;
+  setConnection("Não foi possível acessar o Firestore. Confira as regras e a configuração do Firebase.", false);
   gifts = seedGifts.map(g => ({...g}));
   render();
 });
