@@ -123,6 +123,7 @@ function render() {
   grid.innerHTML = filteredGifts
     .map(gift => {
       const reserved = gift.reserved === true;
+
       const canReserve =
         firestoreReady &&
         !reserved;
@@ -247,66 +248,394 @@ function closeModal() {
   selectedGift = null;
 }
 
+/* =========================================================
+   AVISO PERSONALIZADO DE RESERVA
+========================================================= */
+
+function showSuccessModal(giftName) {
+
+  let style = document.getElementById("success-modal-style");
+
+  if (!style) {
+    style = document.createElement("style");
+
+    style.id = "success-modal-style";
+
+    style.textContent = `
+      .success-modal{
+        position:fixed;
+        inset:0;
+        z-index:100;
+        display:grid;
+        place-items:center;
+        padding:20px;
+        opacity:0;
+        pointer-events:none;
+        transition:opacity .25s ease;
+      }
+
+      .success-modal.show{
+        opacity:1;
+        pointer-events:auto;
+      }
+
+      .success-modal-backdrop{
+        position:absolute;
+        inset:0;
+        background:rgba(5,46,22,.76);
+        backdrop-filter:blur(7px);
+      }
+
+      .success-modal-card{
+        position:relative;
+        width:min(470px,100%);
+        background:#fff;
+        border:1px solid var(--line);
+        border-radius:28px;
+        padding:34px 28px 28px;
+        text-align:center;
+        box-shadow:0 30px 90px rgba(0,0,0,.30);
+        transform:translateY(18px) scale(.97);
+        transition:transform .3s ease;
+      }
+
+      .success-modal.show .success-modal-card{
+        transform:translateY(0) scale(1);
+      }
+
+      .success-modal-close{
+        position:absolute;
+        top:10px;
+        right:14px;
+        width:38px;
+        height:38px;
+        border:0;
+        background:transparent;
+        color:#718078;
+        font-size:30px;
+        line-height:1;
+        cursor:pointer;
+        border-radius:50%;
+      }
+
+      .success-modal-close:hover{
+        background:var(--green-50);
+        color:var(--green-800);
+      }
+
+      .success-heart{
+        width:82px;
+        height:82px;
+        margin:0 auto 18px;
+        display:grid;
+        place-items:center;
+        border-radius:50%;
+        background:var(--green-50);
+        border:1px solid var(--green-100);
+        font-size:42px;
+        animation:successHeart .55s ease;
+      }
+
+      .success-kicker{
+        display:block;
+        color:var(--green-700);
+        font-size:11px;
+        font-weight:800;
+        letter-spacing:2px;
+        margin-bottom:8px;
+      }
+
+      .success-modal-card h2{
+        color:var(--ink);
+        margin:0 0 12px;
+        font:700 clamp(30px,6vw,40px)/1.1 "Playfair Display",Georgia,serif;
+      }
+
+      .success-modal-card p{
+        color:var(--muted);
+        line-height:1.7;
+        margin:0 auto 20px;
+        max-width:370px;
+      }
+
+      .success-gift-name{
+        display:inline-block;
+        margin:4px auto 22px;
+        padding:10px 16px;
+        border-radius:12px;
+        background:var(--green-50);
+        border:1px solid var(--green-100);
+        color:var(--green-900);
+        font-weight:800;
+        font-size:14px;
+      }
+
+      .success-modal-button{
+        width:100%;
+        border:0;
+        border-radius:13px;
+        padding:14px 18px;
+        background:var(--green-700);
+        color:#fff;
+        font-weight:800;
+        font-size:15px;
+        cursor:pointer;
+        transition:.2s;
+      }
+
+      .success-modal-button:hover{
+        background:var(--green-900);
+        transform:translateY(-1px);
+      }
+
+      .success-note{
+        display:block;
+        margin-top:12px;
+        color:#7b897f;
+        font-size:11px;
+      }
+
+      @keyframes successHeart{
+        0%{
+          opacity:0;
+          transform:scale(.6);
+        }
+
+        70%{
+          transform:scale(1.08);
+        }
+
+        100%{
+          opacity:1;
+          transform:scale(1);
+        }
+      }
+
+      @media(max-width:520px){
+        .success-modal{
+          padding:16px;
+        }
+
+        .success-modal-card{
+          border-radius:24px;
+          padding:30px 22px 24px;
+        }
+
+        .success-heart{
+          width:72px;
+          height:72px;
+          font-size:37px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  const existing =
+    document.getElementById("successModal");
+
+  if (existing) {
+    existing.remove();
+  }
+
+  const modal =
+    document.createElement("div");
+
+  modal.id = "successModal";
+  modal.className = "success-modal";
+
+  modal.innerHTML = `
+    <div
+      class="success-modal-backdrop"
+      data-success-close
+    ></div>
+
+    <section
+      class="success-modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="successModalTitle"
+    >
+
+      <button
+        class="success-modal-close"
+        type="button"
+        aria-label="Fechar"
+        data-success-close
+      >
+        ×
+      </button>
+
+      <div class="success-heart">
+        💗
+      </div>
+
+      <span class="success-kicker">
+        RESERVA CONFIRMADA
+      </span>
+
+      <h2 id="successModalTitle">
+        Presente reservado!
+      </h2>
+
+      <p>
+        Muito obrigado pelo carinho! ❤️
+        Este presente foi reservado com sucesso
+        e agora faz parte da nossa nova casa.
+      </p>
+
+      <div class="success-gift-name">
+        🎁 ${esc(giftName)}
+      </div>
+
+      <button
+        type="button"
+        class="success-modal-button"
+        data-success-close
+      >
+        Continuar
+      </button>
+
+      <small class="success-note">
+        Obrigado por fazer parte desse momento especial. 🏠💕
+      </small>
+
+    </section>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeSuccessModal = () => {
+    modal.classList.remove("show");
+
+    setTimeout(() => {
+      modal.remove();
+    }, 250);
+  };
+
+  modal
+    .querySelectorAll("[data-success-close]")
+    .forEach(element => {
+      element.addEventListener(
+        "click",
+        closeSuccessModal
+      );
+    });
+
+  const handleEscape = event => {
+    if (event.key === "Escape") {
+      closeSuccessModal();
+      document.removeEventListener(
+        "keydown",
+        handleEscape
+      );
+    }
+  };
+
+  document.addEventListener(
+    "keydown",
+    handleEscape
+  );
+
+  requestAnimationFrame(() => {
+    modal.classList.add("show");
+  });
+}
+
+/* =========================================================
+   RESERVA DO PRESENTE
+========================================================= */
+
 async function reserveGift() {
-  const name = $("guestName").value.trim();
+
+  const name =
+    $("guestName").value.trim();
 
   if (!selectedGift) {
     return;
   }
 
   if (name.length < 2) {
+
     $("guestName").focus();
 
-    alert("Digite seu nome para reservar o presente.");
+    alert(
+      "Digite seu nome para reservar o presente."
+    );
 
     return;
   }
 
-  const giftId = selectedGift.id;
-  const button = $("confirmBtn");
+  const giftId =
+    selectedGift.id;
+
+  const giftName =
+    selectedGift.name;
+
+  const button =
+    $("confirmBtn");
 
   button.disabled = true;
-  button.textContent = "Reservando...";
+
+  button.textContent =
+    "Reservando...";
 
   try {
-    await runTransaction(db, async transaction => {
-      const giftRef = doc(
-        db,
-        "gifts",
-        giftId
-      );
 
-      const giftSnapshot =
-        await transaction.get(giftRef);
+    await runTransaction(
+      db,
+      async transaction => {
 
-      if (!giftSnapshot.exists()) {
-        throw new Error("not-found");
-      }
+        const giftRef =
+          doc(
+            db,
+            "gifts",
+            giftId
+          );
 
-      const currentGift =
-        giftSnapshot.data();
+        const giftSnapshot =
+          await transaction.get(
+            giftRef
+          );
 
-      if (currentGift.reserved === true) {
-        throw new Error("already-reserved");
-      }
-
-      transaction.update(
-        giftRef,
-        {
-          reserved: true,
-          reservedBy: name,
-          reservedAt: serverTimestamp()
+        if (!giftSnapshot.exists()) {
+          throw new Error(
+            "not-found"
+          );
         }
-      );
-    });
+
+        const currentGift =
+          giftSnapshot.data();
+
+        if (
+          currentGift.reserved === true
+        ) {
+          throw new Error(
+            "already-reserved"
+          );
+        }
+
+        transaction.update(
+          giftRef,
+          {
+            reserved: true,
+            reservedBy: name,
+            reservedAt:
+              serverTimestamp()
+          }
+        );
+      }
+    );
 
     closeModal();
 
-    alert(
-      "Presente reservado com sucesso! ❤️"
+    showSuccessModal(
+      giftName
     );
 
   } catch (error) {
+
     console.error(
       "Erro ao reservar presente:",
       error
@@ -316,41 +645,51 @@ async function reserveGift() {
       error.message ===
       "already-reserved"
     ) {
+
       alert(
         "Esse presente acabou de ser reservado por outra pessoa. Escolha outro item."
       );
+
     } else if (
       error.message ===
       "not-found"
     ) {
+
       alert(
         "Esse presente não está mais disponível."
       );
+
     } else {
+
       alert(
         "Não foi possível reservar agora. Verifique sua conexão e tente novamente."
       );
     }
 
   } finally {
+
     button.disabled = false;
+
     button.textContent =
       "Confirmar reserva ❤️";
   }
 }
 
 function startListeners() {
+
   const giftsCollection =
-    collection(db, "gifts");
+    collection(
+      db,
+      "gifts"
+    );
 
   onSnapshot(
+
     giftsCollection,
 
     snapshot => {
 
       /*
-       * IMPORTANTE:
-       *
        * O Firestore pode possuir documentos antigos.
        * O site NÃO vai mostrar todos eles.
        *
@@ -360,43 +699,49 @@ function startListeners() {
 
       const firestoreGifts =
         new Map(
-          snapshot.docs.map(document => [
-            document.id,
-            {
-              id: document.id,
-              ...document.data()
-            }
-          ])
+          snapshot.docs.map(
+            document => [
+              document.id,
+              {
+                id: document.id,
+                ...document.data()
+              }
+            ]
+          )
         );
 
-      gifts = seedGifts.map(seedGift => {
+      gifts =
+        seedGifts.map(
+          seedGift => {
 
-        const savedGift =
-          firestoreGifts.get(
-            seedGift.id
-          );
+            const savedGift =
+              firestoreGifts.get(
+                seedGift.id
+              );
 
-        if (!savedGift) {
-          return {
-            ...seedGift,
-            reserved: false,
-            reservedBy: "",
-            reservedAt: null,
-            visible: true
-          };
-        }
+            if (!savedGift) {
 
-        return {
-          ...seedGift,
-          ...savedGift,
+              return {
+                ...seedGift,
+                reserved: false,
+                reservedBy: "",
+                reservedAt: null,
+                visible: true
+              };
+            }
 
-          /*
-           * O ID oficial sempre vem
-           * do gifts.js.
-           */
-          id: seedGift.id
-        };
-      });
+            return {
+              ...seedGift,
+              ...savedGift,
+
+              /*
+               * O ID oficial sempre vem
+               * do gifts.js.
+               */
+              id: seedGift.id
+            };
+          }
+        );
 
       firestoreReady = true;
 
@@ -406,6 +751,7 @@ function startListeners() {
       );
 
       populateCategories();
+
       render();
     },
 
@@ -427,17 +773,24 @@ function startListeners() {
        * Mesmo sem Firestore, mostramos
        * os 100 presentes oficiais.
        */
-      gifts = seedGifts.map(gift => ({
-        ...gift
-      }));
+
+      gifts =
+        seedGifts.map(
+          gift => ({
+            ...gift
+          })
+        );
 
       populateCategories();
+
       render();
     }
   );
 }
 
-/* Eventos da página */
+/* =========================================================
+   EVENTOS DA PÁGINA
+========================================================= */
 
 $("search").addEventListener(
   "input",
@@ -457,10 +810,12 @@ $("closeModal").addEventListener(
 document
   .querySelectorAll("[data-close]")
   .forEach(element => {
+
     element.addEventListener(
       "click",
       closeModal
     );
+
   });
 
 $("confirmBtn").addEventListener(
@@ -471,14 +826,23 @@ $("confirmBtn").addEventListener(
 document.addEventListener(
   "keydown",
   event => {
-    if (event.key === "Escape") {
+
+    if (
+      event.key === "Escape" &&
+      !$("modal").classList.contains("hidden")
+    ) {
       closeModal();
     }
+
   }
 );
 
-/* Inicialização */
+/* =========================================================
+   INICIALIZAÇÃO
+========================================================= */
 
 populateCategories();
+
 render();
+
 startListeners();
