@@ -1,813 +1,358 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+<!DOCTYPE html>
+<html lang="pt-BR">
 
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+<head>
+  <meta charset="UTF-8">
 
-import {
-  getFirestore,
-  collection,
-  onSnapshot,
-  doc,
-  setDoc,
-  updateDoc,
-  writeBatch,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-import { firebaseConfig } from "./firebase-config.js";
-import { seedGifts } from "./gifts.js";
+  <title>Casa Nova — Administração</title>
 
-const app = initializeApp(firebaseConfig);
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
+</head>
 
-const auth = getAuth(app);
-const db = getFirestore(app);
+<body>
 
-const $ = id => document.getElementById(id);
+  <header class="site-header">
 
-let gifts = [];
-let unsubscribeGifts = null;
+    <div class="container header-inner">
 
+      <a
+        href="index.html"
+        class="brand"
+      >
+        🏠 Casa Nova
+      </a>
 
-/* =========================
-   LOGIN
-========================= */
+      <a
+        href="index.html"
+        class="header-link"
+      >
+        Ver lista
+      </a>
 
-$("loginForm").addEventListener(
-  "submit",
-  async event => {
+    </div>
 
-    event.preventDefault();
+  </header>
 
-    const email =
-      $("email").value.trim();
 
-    const password =
-      $("password").value;
+  <main class="container admin-container">
 
-    try {
+    <!-- LOGIN -->
 
-      await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+    <section
+      id="loginCard"
+      class="admin-card"
+    >
 
-      $("loginMessage").classList.add(
-        "hidden"
-      );
+      <div class="admin-heading">
 
-    } catch (error) {
+        <span class="admin-icon">
+          🔐
+        </span>
 
-      console.error(
-        "Erro no login:",
-        error
-      );
+        <div>
 
-      $("loginMessage").textContent =
-        "Não foi possível entrar. Confira o e-mail e a senha.";
+          <h1>
+            Área dos anfitriões
+          </h1>
 
-      $("loginMessage").classList.remove(
-        "hidden"
-      );
-    }
-  }
-);
+          <p>
+            Entre para administrar a lista de presentes.
+          </p>
 
+        </div>
 
-/* =========================
-   LOGOUT
-========================= */
+      </div>
 
-$("logout").addEventListener(
-  "click",
-  async () => {
 
-    try {
+      <form id="loginForm">
 
-      await signOut(auth);
+        <div class="form-group">
 
-    } catch (error) {
+          <label for="email">
+            E-mail
+          </label>
 
-      console.error(
-        "Erro ao sair:",
-        error
-      );
-    }
-  }
-);
+          <input
+            id="email"
+            type="email"
+            autocomplete="email"
+            placeholder="Seu e-mail"
+            required
+          >
 
+        </div>
 
-/* =========================
-   AUTENTICAÇÃO
-========================= */
 
-onAuthStateChanged(
-  auth,
-  user => {
+        <div class="form-group">
 
-    const loggedIn = !!user;
+          <label for="password">
+            Senha
+          </label>
 
-    $("loginCard").classList.toggle(
-      "hidden",
-      loggedIn
-    );
+          <input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Sua senha"
+            required
+          >
 
-    $("adminPanel").classList.toggle(
-      "hidden",
-      !loggedIn
-    );
+        </div>
 
-    if (!loggedIn) {
 
-      gifts = [];
-
-      if (unsubscribeGifts) {
-        unsubscribeGifts();
-        unsubscribeGifts = null;
-      }
+        <button
+          type="submit"
+          class="btn btn-primary btn-full"
+        >
+          Entrar
+        </button>
 
-      return;
-    }
 
-    startAdmin();
-  }
-);
+        <p
+          id="loginMessage"
+          class="error-message hidden"
+        ></p>
 
+      </form>
 
-/* =========================
-   FIRESTORE
-========================= */
+    </section>
 
-function startAdmin() {
 
-  if (unsubscribeGifts) {
-    unsubscribeGifts();
-  }
+    <!-- PAINEL ADMINISTRATIVO -->
 
-  unsubscribeGifts = onSnapshot(
-    collection(db, "gifts"),
+    <section
+      id="adminPanel"
+      class="hidden"
+    >
 
-    snapshot => {
+      <div class="admin-top">
 
-      /*
-       * O Firestore pode conter documentos
-       * antigos, inclusive gift-101 até gift-200.
-       *
-       * A administração trabalha SOMENTE
-       * com os presentes definidos em gifts.js.
-       */
-
-      const firestoreGifts =
-        new Map(
-          snapshot.docs.map(
-            document => [
-              document.id,
-              {
-                id: document.id,
-                ...document.data()
-              }
-            ]
-          )
-        );
-
-      gifts = seedGifts.map(
-        seedGift => {
-
-          const savedGift =
-            firestoreGifts.get(
-              seedGift.id
-            );
-
-          if (!savedGift) {
-
-            return {
-              ...seedGift,
-
-              reserved: false,
-              reservedBy: "",
-              reservedAt: null,
-              visible: true
-            };
-          }
-
-          return {
-            ...seedGift,
-            ...savedGift,
-
-            id: seedGift.id
-          };
-        }
-      );
-
-      render();
-    },
-
-    error => {
-
-      console.error(
-        "Erro ao carregar presentes:",
-        error
-      );
-
-      gifts =
-        seedGifts.map(
-          gift => ({
-            ...gift
-          })
-        );
-
-      render();
-    }
-  );
-}
-
-
-/* =========================
-   RENDERIZAÇÃO
-========================= */
-
-function render() {
-
-  if (
-    !$("totalStat") ||
-    !$("visibleStat") ||
-    !$("reservedStat") ||
-    !$("manageList")
-  ) {
-    return;
-  }
-
-
-  /* =========================
-     ESTATÍSTICAS
-  ========================= */
-
-  $("totalStat").textContent =
-    gifts.length;
-
-  $("visibleStat").textContent =
-    gifts.filter(
-      gift =>
-        gift.visible !== false
-    ).length;
-
-  $("reservedStat").textContent =
-    gifts.filter(
-      gift =>
-        gift.reserved === true
-    ).length;
-
-
-  /* =========================
-     CATEGORIAS
-  ========================= */
-
-  const categories = [
-    "Todos",
-    ...new Set(
-      gifts
-        .map(gift => gift.category)
-        .filter(Boolean)
-    )
-  ];
-
-  const oldCategory =
-    $("adminCategory").value;
-
-  $("adminCategory").innerHTML =
-    categories
-      .map(
-        category =>
-          `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`
-      )
-      .join("");
-
-  if (
-    categories.includes(
-      oldCategory
-    )
-  ) {
-    $("adminCategory").value =
-      oldCategory;
-  }
-
-
-  /* =========================
-     FILTROS
-  ========================= */
-
-  const query =
-    $("adminSearch")
-      .value
-      .toLowerCase()
-      .trim();
-
-  const category =
-    $("adminCategory").value;
-
-
-  const list =
-    gifts.filter(
-      gift => {
-
-        const matchesCategory =
-          category === "Todos" ||
-          gift.category === category;
-
-        const searchableText = [
-          gift.name,
-          gift.category,
-          gift.description
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        const matchesSearch =
-          searchableText.includes(
-            query
-          );
-
-        return (
-          matchesCategory &&
-          matchesSearch
-        );
-      }
-    );
-
-
-  /* =========================
-     LISTA
-  ========================= */
-
-  $("manageList").innerHTML =
-    list
-      .map(gift => {
-
-        const reserved =
-          gift.reserved === true;
-
-        const visible =
-          gift.visible !== false;
-
-        return `
-          <div class="manage-item">
-
-            <span class="manage-emoji">
-              ${escapeHtml(
-                gift.emoji || "🎁"
-              )}
-            </span>
-
-            <div class="manage-info">
-
-              <b>
-                ${escapeHtml(
-                  gift.name
-                )}
-              </b>
-
-              <small>
-
-                ${escapeHtml(
-                  gift.category || "Casa"
-                )}
-
-                ${
-                  reserved
-                    ? ` · 🔴 reservado por ${escapeHtml(
-                        gift.reservedBy ||
-                        "convidado"
-                      )}`
-                    : " · 🟢 disponível"
-                }
-
-              </small>
-
-            </div>
-
-            <label
-              class="switch"
-              title="${
-                visible
-                  ? "Ocultar presente"
-                  : "Mostrar presente"
-              }"
-            >
-
-              <input
-                type="checkbox"
-                data-visible="${escapeHtml(
-                  gift.id
-                )}"
-                ${
-                  visible
-                    ? "checked"
-                    : ""
-                }
-              >
-
-              <span></span>
-
-            </label>
-
-            ${
-              reserved
-                ? `
-                  <button
-                    class="mini-action"
-                    data-release="${escapeHtml(
-                      gift.id
-                    )}"
-                  >
-                    Liberar
-                  </button>
-                `
-                : ""
-            }
+        <div>
+
+          <span class="eyebrow">
+            Administração
+          </span>
+
+          <h1>
+            Lista de presentes
+          </h1>
+
+          <p>
+            Gerencie os 100 presentes da sua lista.
+          </p>
+
+        </div>
+
+
+        <button
+          id="logout"
+          class="btn btn-outline"
+        >
+          Sair
+        </button>
+
+      </div>
+
+
+      <!-- ESTATÍSTICAS -->
+
+      <div class="stats-grid">
+
+        <div class="stat-card">
+
+          <span class="stat-label">
+            Cadastrados
+          </span>
+
+          <strong id="totalStat">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <span class="stat-label">
+            Visíveis
+          </span>
+
+          <strong id="visibleStat">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <span class="stat-label">
+            Reservados
+          </span>
+
+          <strong id="reservedStat">
+            0
+          </strong>
+
+        </div>
+
+      </div>
+
+
+      <!-- AÇÕES -->
+
+      <div class="admin-card">
+
+        <div class="admin-section-heading">
+
+          <div>
+
+            <h2>
+              Banco de presentes
+            </h2>
+
+            <p>
+              Mantenha os 100 presentes oficiais sincronizados.
+            </p>
 
           </div>
-        `;
-      })
-      .join("");
-
-
-  /* =========================
-     EVENTOS — VISIBILIDADE
-  ========================= */
-
-  document
-    .querySelectorAll(
-      "[data-visible]"
-    )
-    .forEach(
-      input => {
-
-        input.addEventListener(
-          "change",
-          async event => {
-
-            const giftId =
-              event.target.dataset.visible;
-
-            const visible =
-              event.target.checked;
-
-            event.target.disabled =
-              true;
-
-            try {
-
-              await updateDoc(
-                doc(
-                  db,
-                  "gifts",
-                  giftId
-                ),
-                {
-                  visible
-                }
-              );
-
-            } catch (error) {
-
-              console.error(
-                "Erro ao alterar visibilidade:",
-                error
-              );
-
-              event.target.checked =
-                !visible;
-
-              alert(
-                "Não foi possível alterar a visibilidade do presente."
-              );
-
-            } finally {
-
-              event.target.disabled =
-                false;
-            }
-          }
-        );
-      }
-    );
-
-
-  /* =========================
-     EVENTOS — LIBERAR RESERVA
-  ========================= */
-
-  document
-    .querySelectorAll(
-      "[data-release]"
-    )
-    .forEach(
-      button => {
-
-        button.addEventListener(
-          "click",
-          async () => {
-
-            const giftId =
-              button.dataset.release;
-
-            const confirmed =
-              confirm(
-                "Deseja liberar este presente para que outro convidado possa reservá-lo?"
-              );
-
-            if (!confirmed) {
-              return;
-            }
-
-            button.disabled =
-              true;
-
-            try {
-
-              await updateDoc(
-                doc(
-                  db,
-                  "gifts",
-                  giftId
-                ),
-                {
-                  reserved: false,
-                  reservedBy: "",
-                  reservedAt: null
-                }
-              );
-
-            } catch (error) {
-
-              console.error(
-                "Erro ao liberar reserva:",
-                error
-              );
-
-              alert(
-                "Não foi possível liberar a reserva."
-              );
-
-              button.disabled =
-                false;
-            }
-          }
-        );
-      }
-    );
-}
-
-
-/* =========================
-   SINCRONIZAÇÃO DOS 100
-========================= */
-
-$("syncButton").addEventListener(
-  "click",
-  async () => {
-
-    const confirmed =
-      confirm(
-        "Sincronizar os 100 presentes oficiais? As reservas e a visibilidade existentes serão preservadas."
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    const button =
-      $("syncButton");
-
-    button.disabled = true;
-
-    button.textContent =
-      "Sincronizando...";
-
-    try {
-
-      for (
-        const gift of seedGifts
-      ) {
-
-        await setDoc(
-          doc(
-            db,
-            "gifts",
-            gift.id
-          ),
-          {
-            name: gift.name,
-            category: gift.category,
-            emoji: gift.emoji,
-            description: gift.description
-          },
-          {
-            merge: true
-          }
-        );
-      }
-
-      alert(
-        "Os 100 presentes oficiais foram sincronizados com sucesso."
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Erro ao sincronizar:",
-        error
-      );
-
-      alert(
-        "Não foi possível sincronizar os presentes. Verifique as regras do Firestore."
-      );
-
-    } finally {
-
-      button.disabled = false;
-
-      button.textContent =
-        "Sincronizar 100 presentes";
-    }
-  }
-);
-
-
-/* =========================
-   LIMPEZA DOS PRESENTES ANTIGOS
-========================= */
-
-const cleanupButton =
-  $("cleanupButton");
-
-if (cleanupButton) {
-
-  cleanupButton.addEventListener(
-    "click",
-    async () => {
-
-      const confirmed =
-        confirm(
-          "ATENÇÃO!\n\n" +
-          "Esta ação excluirá SOMENTE os presentes " +
-          "gift-101 até gift-200.\n\n" +
-          "Os 100 presentes oficiais, gift-001 até gift-100, " +
-          "não serão alterados.\n\n" +
-          "Deseja continuar?"
-        );
-
-      if (!confirmed) {
-        return;
-      }
-
-      cleanupButton.disabled =
-        true;
-
-      cleanupButton.textContent =
-        "Limpando...";
-
-      try {
-
-        const snapshot =
-          await getDocs(
-            collection(
-              db,
-              "gifts"
-            )
-          );
-
-        const oldDocs =
-          snapshot.docs.filter(
-            document => {
-
-              const id =
-                document.id;
-
-              if (
-                !id.startsWith(
-                  "gift-"
-                )
-              ) {
-                return false;
-              }
-
-              const number =
-                Number(
-                  id.substring(5)
-                );
-
-              return (
-                Number.isInteger(
-                  number
-                ) &&
-                number >= 101 &&
-                number <= 200
-              );
-            }
-          );
-
-
-        if (
-          oldDocs.length === 0
-        ) {
-
-          alert(
-            "Nenhum presente antigo entre gift-101 e gift-200 foi encontrado."
-          );
-
-          return;
-        }
-
-
-        /*
-         * Firestore permite no máximo
-         * 500 operações por batch.
-         *
-         * Como estamos limpando somente
-         * 100 documentos, um único batch
-         * é suficiente.
-         */
-
-        const batch =
-          writeBatch(db);
-
-        oldDocs.forEach(
-          document => {
-
-            batch.delete(
-              document.ref
-            );
-          }
-        );
-
-        await batch.commit();
-
-
-        alert(
-          `${oldDocs.length} presentes antigos foram removidos com sucesso!`
-        );
-
-      } catch (error) {
-
-        console.error(
-          "Erro ao limpar presentes antigos:",
-          error
-        );
-
-        alert(
-          "Não foi possível limpar os presentes antigos. Verifique o console para mais detalhes."
-        );
-
-      } finally {
-
-        cleanupButton.disabled =
-          false;
-
-        cleanupButton.textContent =
-          "Limpar presentes antigos";
-      }
-    }
-  );
-}
-
-
-/* =========================
-   BUSCA E CATEGORIA
-========================= */
-
-$("adminSearch").addEventListener(
-  "input",
-  render
-);
-
-$("adminCategory").addEventListener(
-  "change",
-  render
-);
-
-
-/* =========================
-   SEGURANÇA HTML
-========================= */
-
-function escapeHtml(value) {
-
-  return String(
-    value ?? ""
-  ).replace(
-    /[&<>"']/g,
-    character => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    }[character])
-  );
-}
+
+        </div>
+
+
+        <div class="admin-actions">
+
+          <button
+            id="syncButton"
+            class="btn btn-primary"
+            type="button"
+          >
+            Sincronizar 100 presentes
+          </button>
+
+
+          <button
+            id="cleanupButton"
+            class="btn btn-outline"
+            type="button"
+          >
+            Limpar presentes antigos
+          </button>
+
+        </div>
+
+
+        <p class="admin-warning">
+          ⚠️ A limpeza remove somente documentos
+          <strong>gift-101</strong> até
+          <strong>gift-200</strong>.
+          Os 100 presentes oficiais não serão alterados.
+        </p>
+
+      </div>
+
+
+      <!-- GERENCIAMENTO -->
+
+      <div class="admin-card">
+
+        <div class="admin-section-heading">
+
+          <div>
+
+            <h2>
+              Gerenciar presentes
+            </h2>
+
+            <p>
+              Pesquise, filtre, oculte ou libere reservas.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <!-- FILTROS -->
+
+        <div class="admin-filters">
+
+          <div class="form-group">
+
+            <label for="adminSearch">
+              Buscar
+            </label>
+
+            <input
+              id="adminSearch"
+              type="search"
+              placeholder="Nome do presente..."
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="adminCategory">
+              Categoria
+            </label>
+
+            <select
+              id="adminCategory"
+            >
+
+              <option value="Todos">
+                Todos
+              </option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+
+        <!-- LISTA -->
+
+        <div
+          id="manageList"
+          class="manage-list"
+        ></div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <footer class="site-footer">
+
+    <div class="container">
+
+      <p>
+        Casa Nova ❤️
+      </p>
+
+    </div>
+
+  </footer>
+
+
+  <script
+    type="module"
+    src="admin.js"
+  ></script>
+
+</body>
+
+</html>
