@@ -13,7 +13,9 @@ import {
   onSnapshot,
   doc,
   setDoc,
-  updateDoc
+  updateDoc,
+  writeBatch,
+  getDocs
 } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 import { firebaseConfig } from "./firebase-config.js";
@@ -34,106 +36,82 @@ let unsubscribeGifts = null;
    LOGIN
 ========================= */
 
-$("loginForm").addEventListener(
-  "submit",
-  async event => {
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
 
-    event.preventDefault();
+  const email = $("email").value.trim();
+  const password = $("password").value;
 
-    const email =
-      $("email").value.trim();
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
 
-    const password =
-      $("password").value;
+    $("loginMessage").classList.add("hidden");
 
-    try {
+  } catch (error) {
 
-      await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+    console.error("Erro no login:", error);
 
-      $("loginMessage").classList.add(
-        "hidden"
-      );
+    $("loginMessage").textContent =
+      "Não foi possível entrar. Confira o e-mail e a senha.";
 
-    } catch (error) {
-
-      console.error(
-        "Erro no login:",
-        error
-      );
-
-      $("loginMessage").textContent =
-        "Não foi possível entrar. Confira o e-mail e a senha.";
-
-      $("loginMessage").classList.remove(
-        "hidden"
-      );
-    }
+    $("loginMessage").classList.remove("hidden");
   }
-);
+});
 
 
 /* =========================
    LOGOUT
 ========================= */
 
-$("logout").addEventListener(
-  "click",
-  async () => {
+$("logout").addEventListener("click", async () => {
 
-    try {
+  try {
 
-      await signOut(auth);
+    await signOut(auth);
 
-    } catch (error) {
+  } catch (error) {
 
-      console.error(
-        "Erro ao sair:",
-        error
-      );
-    }
+    console.error("Erro ao sair:", error);
   }
-);
+});
 
 
 /* =========================
    AUTENTICAÇÃO
 ========================= */
 
-onAuthStateChanged(
-  auth,
-  user => {
+onAuthStateChanged(auth, user => {
 
-    const loggedIn = !!user;
+  const loggedIn = !!user;
 
-    $("loginCard").classList.toggle(
-      "hidden",
-      loggedIn
-    );
+  $("loginCard").classList.toggle(
+    "hidden",
+    loggedIn
+  );
 
-    $("adminPanel").classList.toggle(
-      "hidden",
-      !loggedIn
-    );
+  $("adminPanel").classList.toggle(
+    "hidden",
+    !loggedIn
+  );
 
-    if (!loggedIn) {
+  if (!loggedIn) {
 
-      gifts = [];
+    gifts = [];
 
-      if (unsubscribeGifts) {
-        unsubscribeGifts();
-        unsubscribeGifts = null;
-      }
-
-      return;
+    if (unsubscribeGifts) {
+      unsubscribeGifts();
+      unsubscribeGifts = null;
     }
 
-    startAdmin();
+    return;
   }
-);
+
+  startAdmin();
+});
 
 
 /* =========================
@@ -152,54 +130,44 @@ function startAdmin() {
     snapshot => {
 
       /*
-       * O Firestore pode conter documentos
-       * antigos, inclusive gift-101 até gift-200.
+       * O Firestore pode possuir documentos antigos.
        *
-       * A administração trabalha SOMENTE
-       * com os presentes definidos em gifts.js.
+       * O painel administrativo trabalha somente
+       * com os presentes existentes em gifts.js.
        */
 
-      const firestoreGifts =
-        new Map(
-          snapshot.docs.map(
-            document => [
-              document.id,
-              {
-                id: document.id,
-                ...document.data()
-              }
-            ]
-          )
-        );
-
-      gifts = seedGifts.map(
-        seedGift => {
-
-          const savedGift =
-            firestoreGifts.get(
-              seedGift.id
-            );
-
-          if (!savedGift) {
-
-            return {
-              ...seedGift,
-
-              reserved: false,
-              reservedBy: "",
-              reservedAt: null,
-              visible: true
-            };
+      const firestoreGifts = new Map(
+        snapshot.docs.map(document => [
+          document.id,
+          {
+            id: document.id,
+            ...document.data()
           }
+        ])
+      );
+
+      gifts = seedGifts.map(seedGift => {
+
+        const savedGift =
+          firestoreGifts.get(seedGift.id);
+
+        if (!savedGift) {
 
           return {
             ...seedGift,
-            ...savedGift,
-
-            id: seedGift.id
+            reserved: false,
+            reservedBy: "",
+            reservedAt: null,
+            visible: true
           };
         }
-      );
+
+        return {
+          ...seedGift,
+          ...savedGift,
+          id: seedGift.id
+        };
+      });
 
       render();
     },
@@ -211,12 +179,9 @@ function startAdmin() {
         error
       );
 
-      gifts =
-        seedGifts.map(
-          gift => ({
-            ...gift
-          })
-        );
+      gifts = seedGifts.map(
+        gift => ({ ...gift })
+      );
 
       render();
     }
@@ -240,9 +205,9 @@ function render() {
   }
 
 
-  /*
-   * ESTATÍSTICAS
-   */
+  /* =========================
+     ESTATÍSTICAS
+  ========================= */
 
   $("totalStat").textContent =
     gifts.length;
@@ -260,9 +225,9 @@ function render() {
     ).length;
 
 
-  /*
-   * CATEGORIAS
-   */
+  /* =========================
+     CATEGORIAS
+  ========================= */
 
   const categories = [
     "Todos",
@@ -285,18 +250,16 @@ function render() {
       .join("");
 
   if (
-    categories.includes(
-      oldCategory
-    )
+    categories.includes(oldCategory)
   ) {
     $("adminCategory").value =
       oldCategory;
   }
 
 
-  /*
-   * FILTROS
-   */
+  /* =========================
+     FILTROS
+  ========================= */
 
   const query =
     $("adminSearch")
@@ -309,38 +272,34 @@ function render() {
 
 
   const list =
-    gifts.filter(
-      gift => {
+    gifts.filter(gift => {
 
-        const matchesCategory =
-          category === "Todos" ||
-          gift.category === category;
+      const matchesCategory =
+        category === "Todos" ||
+        gift.category === category;
 
-        const searchableText = [
-          gift.name,
-          gift.category,
-          gift.description
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
+      const searchableText = [
+        gift.name,
+        gift.category,
+        gift.description
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-        const matchesSearch =
-          searchableText.includes(
-            query
-          );
+      const matchesSearch =
+        searchableText.includes(query);
 
-        return (
-          matchesCategory &&
-          matchesSearch
-        );
-      }
-    );
+      return (
+        matchesCategory &&
+        matchesSearch
+      );
+    });
 
 
-  /*
-   * LISTA
-   */
+  /* =========================
+     LISTA
+  ========================= */
 
   $("manageList").innerHTML =
     list
@@ -434,136 +393,128 @@ function render() {
       .join("");
 
 
-  /*
-   * EVENTOS — VISIBILIDADE
-   */
+  /* =========================
+     VISIBILIDADE
+  ========================= */
 
   document
-    .querySelectorAll(
-      "[data-visible]"
-    )
-    .forEach(
-      input => {
+    .querySelectorAll("[data-visible]")
+    .forEach(input => {
 
-        input.addEventListener(
-          "change",
-          async event => {
+      input.addEventListener(
+        "change",
+        async event => {
 
-            const giftId =
-              event.target.dataset.visible;
+          const giftId =
+            event.target.dataset.visible;
 
-            const visible =
-              event.target.checked;
+          const visible =
+            event.target.checked;
+
+          event.target.disabled =
+            true;
+
+          try {
+
+            await updateDoc(
+              doc(
+                db,
+                "gifts",
+                giftId
+              ),
+              {
+                visible
+              }
+            );
+
+          } catch (error) {
+
+            console.error(
+              "Erro ao alterar visibilidade:",
+              error
+            );
+
+            event.target.checked =
+              !visible;
+
+            alert(
+              "Não foi possível alterar a visibilidade do presente."
+            );
+
+          } finally {
 
             event.target.disabled =
-              true;
-
-            try {
-
-              await updateDoc(
-                doc(
-                  db,
-                  "gifts",
-                  giftId
-                ),
-                {
-                  visible
-                }
-              );
-
-            } catch (error) {
-
-              console.error(
-                "Erro ao alterar visibilidade:",
-                error
-              );
-
-              event.target.checked =
-                !visible;
-
-              alert(
-                "Não foi possível alterar a visibilidade do presente."
-              );
-
-            } finally {
-
-              event.target.disabled =
-                false;
-            }
+              false;
           }
-        );
-      }
-    );
+        }
+      );
+    });
 
 
-  /*
-   * EVENTOS — LIBERAR RESERVA
-   */
+  /* =========================
+     LIBERAR RESERVA
+  ========================= */
 
   document
-    .querySelectorAll(
-      "[data-release]"
-    )
-    .forEach(
-      button => {
+    .querySelectorAll("[data-release]")
+    .forEach(button => {
 
-        button.addEventListener(
-          "click",
-          async () => {
+      button.addEventListener(
+        "click",
+        async () => {
 
-            const giftId =
-              button.dataset.release;
+          const giftId =
+            button.dataset.release;
 
-            const confirmed =
-              confirm(
-                "Deseja liberar este presente para que outro convidado possa reservá-lo?"
-              );
+          const confirmed =
+            confirm(
+              "Deseja liberar este presente para que outro convidado possa reservá-lo?"
+            );
 
-            if (!confirmed) {
-              return;
-            }
+          if (!confirmed) {
+            return;
+          }
+
+          button.disabled =
+            true;
+
+          try {
+
+            await updateDoc(
+              doc(
+                db,
+                "gifts",
+                giftId
+              ),
+              {
+                reserved: false,
+                reservedBy: "",
+                reservedAt: null
+              }
+            );
+
+          } catch (error) {
+
+            console.error(
+              "Erro ao liberar reserva:",
+              error
+            );
+
+            alert(
+              "Não foi possível liberar a reserva."
+            );
 
             button.disabled =
-              true;
-
-            try {
-
-              await updateDoc(
-                doc(
-                  db,
-                  "gifts",
-                  giftId
-                ),
-                {
-                  reserved: false,
-                  reservedBy: "",
-                  reservedAt: null
-                }
-              );
-
-            } catch (error) {
-
-              console.error(
-                "Erro ao liberar reserva:",
-                error
-              );
-
-              alert(
-                "Não foi possível liberar a reserva."
-              );
-
-              button.disabled =
-                false;
-            }
+              false;
           }
-        );
-      }
-    );
+        }
+      );
+    });
 }
 
 
 /* =========================
-   SINCRONIZAÇÃO DOS 100
+   SINCRONIZAR 100
 ========================= */
 
 $("syncButton").addEventListener(
@@ -582,7 +533,8 @@ $("syncButton").addEventListener(
     const button =
       $("syncButton");
 
-    button.disabled = true;
+    button.disabled =
+      true;
 
     button.textContent =
       "Sincronizando...";
@@ -628,7 +580,8 @@ $("syncButton").addEventListener(
 
     } finally {
 
-      button.disabled = false;
+      button.disabled =
+        false;
 
       button.textContent =
         "Sincronizar 100 presentes";
@@ -638,13 +591,158 @@ $("syncButton").addEventListener(
 
 
 /* =========================
-   BUSCA E CATEGORIA
+   LIMPAR PRESENTES ANTIGOS
+========================= */
+
+const cleanupButton =
+  $("cleanupButton");
+
+if (cleanupButton) {
+
+  cleanupButton.addEventListener(
+    "click",
+    async () => {
+
+      const confirmed =
+        confirm(
+          "ATENÇÃO!\n\n" +
+          "Esta ação excluirá SOMENTE os presentes " +
+          "gift-101 até gift-200.\n\n" +
+          "Os 100 presentes oficiais, gift-001 até gift-100, " +
+          "não serão alterados.\n\n" +
+          "Deseja continuar?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      cleanupButton.disabled =
+        true;
+
+      cleanupButton.textContent =
+        "Limpando...";
+
+      try {
+
+        const snapshot =
+          await getDocs(
+            collection(
+              db,
+              "gifts"
+            )
+          );
+
+
+        const oldDocs =
+          snapshot.docs.filter(
+            document => {
+
+              const id =
+                document.id;
+
+              if (
+                !id.startsWith(
+                  "gift-"
+                )
+              ) {
+                return false;
+              }
+
+              const number =
+                Number(
+                  id.substring(5)
+                );
+
+              return (
+                Number.isInteger(
+                  number
+                ) &&
+                number >= 101 &&
+                number <= 200
+              );
+            }
+          );
+
+
+        if (
+          oldDocs.length === 0
+        ) {
+
+          alert(
+            "Nenhum presente antigo entre gift-101 e gift-200 foi encontrado."
+          );
+
+          return;
+        }
+
+
+        /*
+         * O Firestore permite até 500
+         * operações em um batch.
+         *
+         * Como vamos remover no máximo
+         * 100 documentos, um batch é suficiente.
+         */
+
+        const batch =
+          writeBatch(db);
+
+
+        oldDocs.forEach(
+          document => {
+
+            batch.delete(
+              document.ref
+            );
+          }
+        );
+
+
+        await batch.commit();
+
+
+        alert(
+          `${oldDocs.length} presentes antigos foram removidos com sucesso!`
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Erro ao limpar presentes antigos:",
+          error
+        );
+
+        alert(
+          "Não foi possível limpar os presentes antigos. Verifique o console para mais detalhes."
+        );
+
+      } finally {
+
+        cleanupButton.disabled =
+          false;
+
+        cleanupButton.textContent =
+          "Limpar presentes antigos";
+      }
+    }
+  );
+}
+
+
+/* =========================
+   BUSCA
 ========================= */
 
 $("adminSearch").addEventListener(
   "input",
   render
 );
+
+
+/* =========================
+   CATEGORIA
+========================= */
 
 $("adminCategory").addEventListener(
   "change",
