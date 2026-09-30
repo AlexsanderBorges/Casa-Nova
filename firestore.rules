@@ -1,34 +1,107 @@
 rules_version = '2';
 
 service cloud.firestore {
+
   match /databases/{database}/documents {
+
     match /gifts/{giftId} {
+
+      /*
+       * =====================================================
+       * LEITURA
+       * =====================================================
+       *
+       * Os convidados precisam conseguir visualizar
+       * a lista de presentes.
+       */
+
       allow read: if true;
 
-      // Primeira carga automática: somente IDs gift-001 até gift-100
-      // e somente no formato inicial de um presente livre.
+
+      /*
+       * =====================================================
+       * CRIAÇÃO
+       * =====================================================
+       *
+       * Somente administrador autenticado pode criar
+       * documentos.
+       *
+       * Apenas gift-001 até gift-100 são permitidos.
+       */
+
       allow create: if
-        giftId.matches('gift-0(0[1-9]|[1-9][0-9])|gift-100') &&
-        request.resource.data.reserved == false &&
-        request.resource.data.reservedBy == "" &&
-        request.resource.data.visible == true &&
-        request.resource.data.name is string &&
-        request.resource.data.category is string &&
-        request.resource.data.emoji is string &&
-        request.resource.data.description is string;
+        request.auth != null
+        &&
+        giftId.matches(
+          'gift-0(0[1-9]|[1-9][0-9])|gift-100'
+        );
 
-      // Convidado: só pode transformar um item livre em reservado.
+
+      /*
+       * =====================================================
+       * RESERVA PELO CONVIDADO
+       * =====================================================
+       *
+       * O convidado pode transformar somente um presente
+       * disponível em reservado.
+       *
+       * Ele não pode alterar:
+       * - nome
+       * - categoria
+       * - descrição
+       * - emoji
+       * - visibilidade
+       */
+
       allow update: if
-        resource.data.reserved == false &&
-        request.resource.data.reserved == true &&
-        request.resource.data.reservedBy is string &&
-        request.resource.data.reservedBy.size() >= 2 &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["reserved", "reservedBy", "reservedAt"]);
 
-      // Área administrativa.
-      allow create, delete: if request.auth != null;
-      allow update: if request.auth != null;
+        resource.data.reserved == false
+
+        &&
+
+        request.resource.data.reserved == true
+
+        &&
+
+        request.resource.data.reservedBy is string
+
+        &&
+
+        request.resource.data.reservedBy.size() >= 2
+
+        &&
+
+        request.resource.data.diff(
+          resource.data
+        ).affectedKeys().hasOnly([
+          'reserved',
+          'reservedBy',
+          'reservedAt'
+        ]);
+
+
+      /*
+       * =====================================================
+       * ADMINISTRADOR
+       * =====================================================
+       *
+       * Usuário autenticado pode administrar
+       * os presentes.
+       */
+
+      allow update: if
+        request.auth != null;
+
+
+      /*
+       * Administrador pode apagar documentos.
+       *
+       * Isso será usado posteriormente para remover
+       * os documentos antigos.
+       */
+
+      allow delete: if
+        request.auth != null;
     }
   }
 }
